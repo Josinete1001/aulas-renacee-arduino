@@ -1,7 +1,7 @@
-const byte PIN_TRIG = 13;   // Pino de disparo (trigger)
-const byte PIN_ECO  = 12;   // Pino de eco (echo)
-const byte PIN_LED  = 8;    // Pino do LED
-const byte PIN_BUZ  = 9;    // Pino da buzina (buzzer)
+const byte PIN_TRIG = ;   // Pino de disparo (trigger)
+const byte PIN_ECO  = ;   // Pino de eco (echo)
+const byte PIN_LED  = ;    // Pino do LED
+const byte PIN_BUZ  = ;    // Pino da buzina (buzzer)
 
 void setup() {
   pinMode(PIN_TRIG, OUTPUT);
@@ -28,7 +28,7 @@ void loop() {
   delay(200);
 
   // Alerta proporcional (entre 0 e 40 cm)
-  if (distancia >= 0 && distancia <= 40) {
+  if (distancia >= 0 && distancia <= ) {
     int tempoEspera = distancia * 10;
 
     // Liga LED e Buzina juntos
