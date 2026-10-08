@@ -1,6 +1,6 @@
-const int pingPin = 12; // Pino único de sinal (SIG)
-const int ledPin = 7;   // Pino do LED
-const int buzzerPin = 8;// Pino do Buzzer
+const int pingPin = ; // Pino único de sinal (SIG)
+const int ledPin = ;   // Pino do LED
+const int buzzerPin = ;// Pino do Buzzer
 
 void setup() {
   Serial.begin(9600);
@@ -32,7 +32,7 @@ void loop() {
   Serial.println(" cm");
 
   // Exemplo de acionamento do alarme (quando menor que 20 cm)
-  if (distancia > 0 && distancia < 40) {
+  if (distancia > 0 && distancia < ) {
     digitalWrite(ledPin, HIGH);
     tone(buzzerPin, 1000); // Emite som no buzzer
   } else {
