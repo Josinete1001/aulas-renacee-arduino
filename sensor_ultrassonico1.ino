@@ -32,7 +32,7 @@ void loop() {
   Serial.println(" cm");
 
   // Exemplo de acionamento do alarme (quando menor que 20 cm)
-  if (distancia > 0 && distancia < ) {
+  if (distancia > 0 && distancia <= ) {
     digitalWrite(ledPin, HIGH);
     tone(buzzerPin, 1000); // Emite som no buzzer
   } else {
