@@ -1,0 +1,106 @@
+/*
+ * Dado Eletrônico com Arduino Uno e Display 7 Segmentos (5161AS)
+ */
+
+// Pinos dos segmentos: A, B, C, D, E, F, G
+const uint8_t pinosSegmentos[7] = {11, 12, 6, 7, 8, 10, 9};
+const uint8_t PINO_BOTAO = 2;
+
+// Representação binária dos dígitos de 1 a 9 (bit 0 = A ... bit 6 = G)
+// Formato dos bits: B0GFEDCBA
+const uint8_t digitosDado[9] = {
+  0b00000110, // 1: B, C
+  0b01011011, // 2: A, B, D, E, G
+  0b01001111, // 3: A, B, C, D, G
+  0b01100110, // 4: B, C, F, G
+  0b01101101, // 5: A, C, D, F, G
+  0b01111101, // 6: A, C, D, E, F, G
+  0b00000111, // 7: A, B, C
+  0b01111111, // 8: A, B, C, D, E, F, G
+  0b01101111  // 9: A, B, C, D, F, G
+};
+
+// Variáveis de controle de fluxo e tempo
+bool sorteioAtivo = true;
+uint8_t faceAtual = 1;
+
+// Controle de debounce do botão
+int ultimoEstadoBotao = HIGH;
+int estadoBotaoEstavel = HIGH;
+unsigned long ultimoTempoDebounce = 0;
+const unsigned long INTERVALO_DEBOUNCE = 50; // milissegundos
+
+// Controle da velocidade de rotação do dado
+unsigned long ultimoTempoRolagem = 0;
+const unsigned long INTERVALO_ROLAGEM = 60;  // velocidade da animação (ms)
+
+void exibirNumero(uint8_t numero) {
+  // Limita a exibição estritamente ao intervalo de 1 a 9
+  if (numero < 1 || numero > 9) return;
+  uint8_t mascara = digitosDado[numero - 1];
+  
+  for (uint8_t i = 0; i < 7; i++) {
+    bool estadoSegmento = bitRead(mascara, i);
+    digitalWrite(pinosSegmentos[i], estadoSegmento ? HIGH : LOW);
+  }
+}
+
+void setup() {
+  // Configuração dos pinos dos segmentos como saídas
+  for (uint8_t i = 0; i < 7; i++) {
+    pinMode(pinosSegmentos[i], OUTPUT);
+    digitalWrite(pinosSegmentos[i], LOW);
+  }
+
+  // Entrada com pull-up interno ativado
+  pinMode(PINO_BOTAO, INPUT_PULLUP);
+
+  // Inicializa o gerador pseudoaleatório com ruído de pino analógico flutuante
+  randomSeed(analogRead(A0));
+
+  // Exibe o primeiro número sorteado (limite superior 10 é exclusivo -> intervalo [1, 9])
+  faceAtual = random(1, 10);
+  exibirNumero(faceAtual);
+}
+
+void loop() {
+  unsigned long tempoAtual = millis();
+
+  // 1. Leitura e Debounce do Botão (INPUT_PULLUP: pressionado = LOW)
+  int leituraAtual = digitalRead(PINO_BOTAO);
+
+  if (leituraAtual != ultimoEstadoBotao) {
+    ultimoTempoDebounce = tempoAtual;
+  }
+
+  if ((tempoAtual - ultimoTempoDebounce) > INTERVALO_DEBOUNCE) {
+    // Se a leitura estabilizou e houve transição de estado
+    if (leituraAtual != estadoBotaoEstavel) {
+      estadoBotaoEstavel = leituraAtual;
+
+      // Borda de descida: botão acabou de ser pressionado
+      if (estadoBotaoEstavel == LOW) {
+        sorteioAtivo = !sorteioAtivo;
+        
+        // Ao pausar, fixa a face final; ao retomar, reaquece a semente com o timer de microssegundos
+        if (!sorteioAtivo) {
+          exibirNumero(faceAtual);
+        } else {
+          randomSeed(micros());
+        }
+      }
+    }
+  }
+  ultimoEstadoBotao = leituraAtual;
+
+  // 2. Animação de sorteio contínuo sem bloquear com delay()
+  if (sorteioAtivo) {
+    if (tempoAtual - ultimoTempoRolagem >= INTERVALO_ROLAGEM) {
+      ultimoTempoRolagem = tempoAtual;
+      
+      // Gera inteiros equiprováveis entre 1 e 9
+      faceAtual = random(1, 10);
+      exibirNumero(faceAtual);
+    }
+  }
+}
