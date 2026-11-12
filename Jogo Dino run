@@ -1,0 +1,313 @@
+// Constantes
+#define facilite 60        // Base de tempo inicial (delay inicial mais calmo)
+#define nbDeCasesASauter 3 // Représente la longueur possible du saut du dinosaure
+#define limiteGauche 0     // Curseur de colisão ajustado para dino de 1 bloco (coluna 0)
+#define limiteDroite 0     // Curseur de colisão ajustado para dino de 1 bloco (coluna 0)
+#define nombreNote 38      // Nombre de note de la phrase musicale
+#define longueurNote 2     // longueur de la note de musique en multiple de boucle
+#define bas 0
+#define haut 1
+
+// Câblage matériel
+#define boutonJump 13
+#define speaker 6
+#define RESET 7
+
+// Déboguage
+#define sp Serial.print
+#define spln Serial.println
+
+// Notes de musique
+const float r = pow(2, 1.0 / 12);
+const float DO2  = 130.81;
+const float RE2  = 146.83;
+const float MI2  = 164.81;
+const float FA2  = 174.61;
+const float SOL2 = 196.0;
+const float LA2  = 220.0;
+const float SI2  = 246.94;
+const float DO3  = 261.63;
+const float RE3  = 293.66;
+const float MI3  = 329.63;
+const float FA3  = 349.23;
+const float FA3d = 369.99;
+const float SOL3 = 392.0;
+const float LA3  = 440.0;
+const float SI3  = 493.88;
+const float DO4  = 523.25;
+const float RE4  = 587.33;
+const float MI4  = 659.29;
+const float FA4  = 698.46;
+const float SOL4 = 783.99;
+const float LA4  = 880.0;
+const float SI4  = 987.77;
+const float DO5  = 1046.5;
+const float RE5  = 1174.7;
+const float MI5  = 1318.5;
+const float FA5  = 1396.9;
+const float SOL5 = 1568.0;
+
+const float musique[nombreNote] = {
+  RE3, SI2, RE3, SOL2, RE3, SI2, RE3, SOL2, RE3, SI2, RE3, SOL2,
+  MI3, DO3, MI3, SOL2, MI3, DO3, MI3, SOL2, MI3, DO3, MI3, SOL2,
+  FA3d, SOL3, SOL3, SOL3, FA3d, MI3, RE3, RE3, RE3, SI2, SOL2, SOL2, SOL2, SOL2
+};
+
+// LCD (não I2C)
+#include <LiquidCrystal.h>
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+/************* DECLARAÇÃO DE FUNÇÕES **************/
+void CGRAM(void);
+void affichePersonnage(byte x, bool y);
+int cible1(bool PersoHaut);
+int cible2(bool PersoHaut);
+void afficheScore(int score);
+void nouvellePartie(void);
+void gameOver(void);
+void acceleration(void);
+
+/************* SETUP **************/
+void setup(){
+  Serial.begin(38400);
+  pinMode(boutonJump, INPUT);
+  pinMode(speaker, OUTPUT);
+  lcd.begin(16, 2);
+  randomSeed(analogRead(0));
+
+  // Animação de texto inicial
+  lcd.setCursor(16, 0);
+  lcd.print("Pressione o botao");
+  for (int positionCounter = 0; positionCounter < nombreNote; positionCounter++) {
+    tone(speaker, musique[positionCounter]);
+    lcd.scrollDisplayLeft();
+    delay(250);
+    if(digitalRead(boutonJump)) break;
+  }
+  noTone(speaker);
+
+  CGRAM();
+  lcd.clear();
+  delay(1000);
+  afficheScore(0);
+}
+
+/*************** LOOP ****************/
+void loop(){
+  bool positionPerso;
+  int positionCible1;
+  int positionCible2;
+  static bool memoBouton = 0;
+  static byte longueurSaut = 0;
+  static unsigned int boucle = 0;
+  static unsigned int score = 0;
+
+  if(!memoBouton){
+    tone(speaker, musique[(boucle / longueurNote) % (nombreNote - 1)]);
+  }
+
+  acceleration();
+  if(memoBouton == 0){
+    memoBouton = digitalRead(boutonJump);
+  }
+
+  // Lógica de pulo
+  if(memoBouton && longueurSaut <= nbDeCasesASauter){
+    tone(speaker, (musique[(boucle / longueurNote) % (nombreNote - 1)]) * 2);
+    positionPerso = haut;
+    longueurSaut = longueurSaut + 1;
+  }
+  else{
+    positionPerso = bas;
+    longueurSaut = 0;
+    memoBouton = 0;
+  }
+
+  affichePersonnage(0, positionPerso);
+
+  acceleration();
+  if(memoBouton == 0){
+    memoBouton = digitalRead(boutonJump);
+  }
+
+  // Movimentação dos cactos
+  positionCible1 = cible1(positionPerso);
+  positionCible2 = cible2(positionPerso);
+
+  // Verificação de colisão
+  while(positionPerso == bas && ((positionCible1 <= limiteDroite && positionCible1 >= limiteGauche) || 
+                                (positionCible2 <= limiteDroite && positionCible2 >= limiteGauche))){
+    gameOver();
+  }
+
+  // Pontuação ao passar pelo obstáculo
+  if(memoBouton && (positionCible1 == 0 || positionCible2 == 0)){
+    score = score + 1;
+    afficheScore(score);
+  }
+
+  acceleration();
+  if(memoBouton == 0){
+    memoBouton = digitalRead(boutonJump);
+  }
+
+  boucle = boucle + 1;
+}
+
+/***************** CGRAM ******************/
+void CGRAM(void){
+  // 0: Dinossauro compacto (5x8)
+  byte dinoPequeno[8] = {
+    B00111,
+    B00101,
+    B00111,
+    B10110,
+    B11111,
+    B01110,
+    B01010,
+    B01010
+  };
+
+  // 1: Cacto pequeno / árvore menor
+  byte cactoPequeno[8] = {
+    B00000,
+    B00000,
+    B00000,
+    B00100,
+    B01101,
+    B00111,
+    B00100,
+    B00100
+  };
+
+  // 2: Cacto médio / arbusto compacto
+  byte cactoMedio[8] = {
+    B00000,
+    B00100,
+    B00101,
+    B10101,
+    B10111,
+    B01100,
+    B00100,
+    B00100
+  };
+
+  lcd.createChar(0, dinoPequeno);
+  lcd.createChar(1, cactoPequeno);
+  lcd.createChar(2, cactoMedio);
+}
+
+/************* AFFICHEPERSONNAGE **************/
+void affichePersonnage(byte x, bool y){
+  if(y == bas){
+    lcd.setCursor(x, 0);
+    lcd.print(" ");              // Limpa linha superior
+    lcd.setCursor(x, 1);
+    lcd.write((unsigned char)0);  // Dino no chão
+  }
+  else{
+    lcd.setCursor(x, 1);
+    lcd.print(" ");              // Limpa chão
+    lcd.setCursor(x, 0);
+    lcd.write((unsigned char)0);  // Dino no ar
+  }
+}
+
+/************** CIBLES **************/
+int cible1(bool PersoHaut){
+  static int x = random(15, 20);
+  lcd.setCursor(x, 1);
+  if(x > 0){
+    lcd.print(" ");
+  }
+  if(x >= 0){
+    x = x - 1;
+    lcd.setCursor(x, 1);
+    lcd.write((unsigned char)1); // Usa o novo cacto menor
+  }
+  else{
+    x = random(15, 20);
+  }
+  return x;
+}
+
+int cible2(bool PersoHaut){
+  static int x = random(25, 30);
+  lcd.setCursor(x, 1);
+  if(x > 0){
+    lcd.print(" ");
+  }
+  if(x >= 0){
+    x = x - 1;
+    lcd.setCursor(x, 1);
+    lcd.write((unsigned char)2); // Usa o novo cacto médio
+  }
+  else{
+    x = random(25, 30);
+  }
+  return x;
+}
+
+/******* AFFICHESCORE *******/
+void afficheScore(int score){
+  lcd.setCursor(6, 0);
+  lcd.print("Score:");
+  if(score < 10){
+    lcd.print("00");
+  }
+  else if(score < 100){
+    lcd.print("0");
+  }
+  lcd.print(score);
+}
+
+/************ NOUVELLEPARTIE ************/
+void nouvellePartie(void){
+  for(int i = 0; i < 3; i++){
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("       New      ");
+    lcd.setCursor(0, 1);
+    lcd.print("      Game!     ");
+    delay(500);
+    lcd.clear();
+    delay(200);
+  }
+  pinMode(RESET, OUTPUT);
+  digitalWrite(RESET, LOW);
+}
+
+/************ GAMEOVER ************/
+void gameOver(void){
+  noTone(speaker);
+  lcd.setCursor(4, 1);
+  lcd.print("  Game Over ");
+  delay(500);
+  if(digitalRead(boutonJump)) nouvellePartie();
+
+  lcd.setCursor(4, 1);
+  lcd.print("            ");
+  delay(200);
+  if(digitalRead(boutonJump)) nouvellePartie();
+
+  lcd.setCursor(4, 1);
+  lcd.print("Pressione o botao");
+  delay(500);
+  if(digitalRead(boutonJump)) nouvellePartie();
+}
+
+/*********** ACCELERATION **********/
+void acceleration(void){
+  static unsigned int variation = 50; // Demora 5x mais ciclos para subir cada degrau de velocidade
+  static unsigned int vitesse = 0;
+  const unsigned int vitesseMax = 30; // Limite máximo para o jogo não ficar incontrolável
+
+  if(variation == 0){
+    if(vitesse < vitesseMax){
+      vitesse = vitesse + 1;
+    }
+    variation = 50; // Reseta a contagem longa
+  }
+  delay((facilite - vitesse) + 1);
+  variation = variation - 1;
+}
